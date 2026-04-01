@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="90" fill="#1e1e2e"/>
+  <!-- Calendar body -->
+  <rect x="76" y="130" width="360" height="300" rx="22" fill="white"/>
+  <!-- Header bar -->
+  <rect x="76" y="130" width="360" height="92" rx="22" fill="#3b82f6"/>
+  <rect x="76" y="180" width="360" height="42" fill="#3b82f6"/>
+  <!-- Calendar hooks -->
+  <rect x="166" y="92" width="18" height="60" rx="9" fill="#94a3b8"/>
+  <rect x="328" y="92" width="18" height="60" rx="9" fill="#94a3b8"/>
+  <!-- Schedule blocks -->
+  <rect x="104" y="248" width="68" height="18" rx="9" fill="#6366f1"/>
+  <rect x="180" y="248" width="92" height="18" rx="9" fill="#ef4444"/>
+  <rect x="280" y="248" width="60" height="18" rx="9" fill="#22c55e"/>
+  <rect x="104" y="282" width="44" height="18" rx="9" fill="#f59e0b"/>
+  <rect x="156" y="282" width="110" height="18" rx="9" fill="#3b82f6"/>
+  <rect x="274" y="282" width="66" height="18" rx="9" fill="#a855f7"/>
+  <rect x="104" y="316" width="82" height="18" rx="9" fill="#ec4899"/>
+  <rect x="194" y="316" width="56" height="18" rx="9" fill="#14b8a6"/>
+  <rect x="258" y="316" width="82" height="18" rx="9" fill="#f97316"/>
+  <rect x="104" y="350" width="100" height="18" rx="9" fill="#64748b"/>
+  <rect x="212" y="350" width="58" height="18" rx="9" fill="#ef4444"/>
+  <rect x="278" y="350" width="62" height="18" rx="9" fill="#0891b2"/>
+  <!-- Pin icon on one block -->
+  <circle cx="348" cy="257" r="14" fill="#fef3c7"/>
+  <text x="348" y="263" font-size="16" text-anchor="middle" font-family="Apple Color Emoji,Segoe UI Emoji,sans-serif">📌</text>
+</svg>

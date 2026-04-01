@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>週課表規劃</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e1e2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="週課表">
+    <link rel="apple-touch-icon" href="icon.svg">
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ===== SIDEBAR ===== */
+        #sidebar-backdrop {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.4); z-index: 199;
+        }
+        #sidebar-backdrop.show { display: block; }
+
+        #sidebar {
+            width: 148px; background: #1e1e2e; color: white;
+            padding: 12px 8px; overflow-y: auto;
+            flex-shrink: 0; display: flex; flex-direction: column;
+            gap: 5px; z-index: 200;
+        }
+
+        #sidebar h2 {
+            font-size: 10px; font-weight: 600; color: #7a8099;
+            margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.8px;
+        }
+
+        .preset-block {
+            padding: 7px 8px; border-radius: 7px; cursor: grab;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 11px; font-weight: 600; color: white;
+            user-select: none; touch-action: none;
+            transition: transform 0.15s, filter 0.15s; position: relative;
+        }
+        .preset-block:hover { transform: scale(1.03); filter: brightness(1.1); }
+        .preset-block:active { cursor: grabbing; }
+        .preset-block .icon { font-size: 14px; line-height: 1; }
+
+        .del-preset {
+            position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+            width: 13px; height: 13px; border-radius: 50%;
+            background: rgba(0,0,0,0.3); border: none;
+            color: rgba(255,255,255,0.7); cursor: pointer;
+            font-size: 8px; display: none; align-items: center; justify-content: center;
+        }
+        .preset-block:hover .del-preset { display: flex; }
+        .del-preset:hover { background: rgba(0,0,0,0.6) !important; color: white; }
+
+        #add-custom-btn {
+            margin-top: 4px; padding: 7px 8px;
+            border: 1px dashed #7a8099; border-radius: 7px;
+            color: #7a8099; font-size: 11px;
+            cursor: pointer; text-align: center;
+            background: none; width: 100%; transition: all 0.2s;
+        }
+        #add-custom-btn:hover { border-color: #a9b1d6; color: #a9b1d6; }
+        #sidebar::-webkit-scrollbar { width: 3px; }
+        #sidebar::-webkit-scrollbar-thumb { background: #3e3e4e; border-radius: 2px; }
+
+        /* ===== MAIN ===== */
+        #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+        /* ===== TOP BAR ===== */
+        #topbar {
+            padding: 9px 12px; background: white; border-bottom: 1px solid #e2e8f0;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0; gap: 8px;
+        }
+
+        #menu-btn {
+            display: none; width: 30px; height: 30px; border-radius: 6px;
+            border: 1px solid #e2e8f0; background: white; cursor: pointer;
+            font-size: 15px; align-items: center; justify-content: center;
+            color: #374151; flex-shrink: 0;
+        }
+
+        #topbar h1 { font-size: 16px; font-weight: 700; color: #1e293b; white-space: nowrap; }
+
+        #week-nav { display: flex; align-items: center; gap: 5px; }
+
+        .nav-btn {
+            width: 28px; height: 28px; border-radius: 6px;
+            border: 1px solid #e2e8f0; background: white; cursor: pointer;
+            font-size: 15px; display: flex; align-items: center; justify-content: center;
+            color: #64748b; transition: all 0.15s;
+        }
+        .nav-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+
+        #week-label { font-size: 13px; color: #374151; font-weight: 600; min-width: 110px; text-align: center; }
+
+        #today-btn {
+            padding: 4px 10px; border-radius: 6px; border: 1px solid #e2e8f0;
+            background: white; color: #3b82f6; font-size: 12px; font-weight: 600;
+            cursor: pointer; transition: all 0.15s;
+        }
+        #today-btn:hover { background: #eff6ff; border-color: #bfdbfe; }
+
+        .topbar-right { display: flex; align-items: center; gap: 6px; }
+
+        #sync-btn {
+            display: flex; align-items: center; gap: 4px;
+            padding: 4px 9px; border-radius: 6px; border: 1px solid #e2e8f0;
+            background: white; color: #374151; font-size: 12px;
+            cursor: pointer; transition: all 0.15s; white-space: nowrap;
+        }
+        #sync-btn:hover { background: #f0f7ff; border-color: #bfdbfe; }
+
+        #sync-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: #94a3b8; flex-shrink: 0; transition: background 0.4s;
+        }
+        #sync-dot.ok      { background: #22c55e; }
+        #sync-dot.syncing { background: #f59e0b; animation: pulse 1s infinite; }
+        #sync-dot.error   { background: #ef4444; }
+        #sync-dot.offline { background: #94a3b8; }
+
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+        #clear-btn {
+            padding: 4px 10px; border-radius: 6px; border: 1px solid #e2e8f0;
+            background: white; color: #64748b; font-size: 12px;
+            cursor: pointer; transition: all 0.15s; white-space: nowrap;
+        }
+        #clear-btn:hover { background: #fee2e2; color: #ef4444; border-color: #fecaca; }
+
+        /* ===== HINT ===== */
+        #hint {
+            text-align: center; font-size: 11px; color: #94a3b8;
+            padding: 4px; background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+        }
+
+        /* ===== SCHEDULE ===== */
+        #schedule-wrapper { flex: 1; overflow: auto; }
+        #schedule-inner { display: flex; flex-direction: column; min-width: 680px; }
+
+        #header-row {
+            display: flex; position: sticky; top: 0; z-index: 30;
+            background: white; border-bottom: 2px solid #e2e8f0;
+        }
+
+        .time-corner {
+            width: 50px; flex-shrink: 0; position: sticky; left: 0; z-index: 40;
+            background: white; border-right: 1px solid #e2e8f0;
+        }
+
+        #day-headers-container { flex: 1; display: flex; }
+
+        .day-header {
+            flex: 1; min-width: 82px; padding: 7px 4px 6px;
+            text-align: center; border-left: 1px solid #e2e8f0;
+        }
+        .day-name { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 3px; }
+        .day-date {
+            font-size: 16px; font-weight: 700; color: #374151;
+            width: 28px; height: 28px;
+            display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;
+        }
+        .day-header.today .day-name { color: #3b82f6; }
+        .day-header.today .day-date { background: #3b82f6; color: white; }
+        .day-header.weekend .day-name { color: #f87171; }
+        .day-header.weekend:not(.today) .day-date { color: #ef4444; }
+
+        #body-row { display: flex; }
+
+        #time-col {
+            width: 50px; flex-shrink: 0; position: sticky; left: 0; z-index: 20;
+            background: #f8fafc; border-right: 1px solid #e2e8f0;
+        }
+        .time-label {
+            position: absolute; right: 6px; font-size: 10px; color: #94a3b8;
+            font-weight: 500; line-height: 1; transform: translateY(-50%); white-space: nowrap;
+        }
+
+        #day-grids-container { flex: 1; display: flex; }
+
+        .day-grid {
+            flex: 1; min-width: 82px; position: relative;
+            border-left: 1px solid #e2e8f0; background: white;
+        }
+        .day-grid.today-col { background: #fffef5; }
+        .day-grid.drag-over { background: #f0f7ff; }
+
+        .hour-line { position: absolute; left: 0; right: 0; border-top: 1px solid #e2e8f0; pointer-events: none; }
+        .half-line { position: absolute; left: 0; right: 0; border-top: 1px dashed #f1f5f9; pointer-events: none; }
+
+        .now-line { position: absolute; left: 0; right: 0; height: 2px; background: #ef4444; z-index: 50; pointer-events: none; }
+        .now-dot { position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; }
+
+        .drop-preview {
+            position: absolute; left: 2px; right: 2px;
+            border-radius: 6px; border: 2px dashed; pointer-events: none; display: none; z-index: 5;
+        }
+
+        /* ===== BLOCKS ===== */
+        .schedule-block {
+            position: absolute; left: 2px; right: 2px;
+            border-radius: 6px; padding: 3px 5px 9px;
+            color: white; font-size: 11px; font-weight: 600;
+            overflow: hidden; cursor: move;
+            user-select: none; touch-action: none;
+            z-index: 10; box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            display: flex; flex-direction: column; gap: 1px; transition: box-shadow 0.15s;
+        }
+        .schedule-block:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.25); z-index: 15; }
+        .schedule-block.is-dragging { opacity: 0.72; box-shadow: 0 6px 20px rgba(0,0,0,0.3); z-index: 100; }
+        .schedule-block.is-pinned { border-left: 3px solid rgba(255,255,255,0.6); }
+
+        .block-header { display: flex; align-items: center; justify-content: space-between; gap: 2px; }
+        .block-name {
+            display: flex; align-items: center; gap: 3px; flex: 1; min-width: 0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .block-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+
+        .block-pin, .block-delete {
+            width: 14px; height: 14px; border-radius: 50%;
+            background: rgba(0,0,0,0.2); border: none; color: white;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; opacity: 0; transition: opacity 0.15s, background 0.15s;
+            font-size: 7px; line-height: 1; padding: 0;
+        }
+        .schedule-block:hover .block-pin,
+        .schedule-block:hover .block-delete { opacity: 1; }
+        .block-pin.pinned-on { opacity: 1; background: rgba(255,255,255,0.35); font-size: 8px; }
+        .block-pin:hover, .block-delete:hover { background: rgba(0,0,0,0.45) !important; }
+
+        .block-time { font-size: 9px; opacity: 0.8; font-weight: 400; }
+
+        .block-resize {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            height: 9px; cursor: ns-resize; background: rgba(0,0,0,0.1);
+            border-radius: 0 0 6px 6px; display: flex; align-items: center; justify-content: center;
+        }
+        .block-resize::after { content: ''; width: 18px; height: 2px; background: rgba(255,255,255,0.5); border-radius: 2px; }
+        .block-resize:hover { background: rgba(0,0,0,0.22); }
+
+        .touch-clone {
+            position: fixed; z-index: 9999; pointer-events: none;
+            border-radius: 7px; padding: 6px 8px;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 11px; font-weight: 600; color: white;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3); transform: scale(1.06); opacity: 0.9;
+        }
+
+        /* ===== SCROLLBAR ===== */
+        #schedule-wrapper::-webkit-scrollbar { width: 6px; height: 6px; }
+        #schedule-wrapper::-webkit-scrollbar-track { background: transparent; }
+        #schedule-wrapper::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+        /* ===== MODALS (shared base) ===== */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+            display: none; align-items: center; justify-content: center;
+            z-index: 1000; padding: 16px;
+        }
+        .modal-overlay.show { display: flex; }
+
+        .modal-box {
+            background: white; border-radius: 14px;
+            padding: 20px; width: 100%; max-width: 320px;
+            display: flex; flex-direction: column; gap: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            max-height: 90vh; overflow-y: auto;
+        }
+
+        .modal-box h3 { font-size: 15px; color: #1e293b; font-weight: 700; }
+
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .modal-box input[type="text"] {
+            padding: 7px 9px; border: 1px solid #e2e8f0;
+            border-radius: 7px; font-size: 13px; width: 100%;
+            outline: none; transition: border-color 0.2s;
+        }
+        .modal-box input[type="text"]:focus { border-color: #3b82f6; }
+
+        .color-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+        .color-opt {
+            width: 24px; height: 24px; border-radius: 5px;
+            cursor: pointer; border: 2px solid transparent; transition: transform 0.1s;
+        }
+        .color-opt:hover { transform: scale(1.15); }
+        .color-opt.sel { border-color: #1e293b; }
+
+        .emoji-row { display: flex; flex-wrap: wrap; gap: 3px; }
+        .emoji-opt {
+            width: 27px; height: 27px; border-radius: 5px;
+            border: 1px solid #e2e8f0; cursor: pointer;
+            font-size: 13px; display: flex; align-items: center; justify-content: center;
+            background: white; transition: background 0.1s;
+        }
+        .emoji-opt:hover { background: #f1f5f9; }
+        .emoji-opt.sel { background: #dbeafe; border-color: #3b82f6; }
+
+        .modal-btns { display: flex; gap: 7px; }
+        .btn { flex: 1; padding: 8px; border-radius: 7px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: #f1f5f9; color: #64748b; }
+        .btn-secondary:hover { background: #e2e8f0; }
+
+        /* ===== SYNC MODAL ===== */
+        #sync-status-bar {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 10px; border-radius: 8px;
+            background: #f8fafc; border: 1px solid #e2e8f0;
+            font-size: 12px; color: #374151;
+        }
+        #sync-status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #94a3b8; flex-shrink: 0;
+        }
+        #sync-status-dot.ok      { background: #22c55e; }
+        #sync-status-dot.syncing { background: #f59e0b; }
+        #sync-status-dot.error   { background: #ef4444; }
+
+        .sync-step {
+            border-left: 2px solid #e2e8f0; padding-left: 10px;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .sync-step-title { font-size: 11px; font-weight: 700; color: #374151; }
+        .sync-step-desc { font-size: 10px; color: #64748b; line-height: 1.4; }
+
+        .sync-code-box {
+            display: flex; gap: 5px; align-items: center;
+        }
+        .sync-code-box code {
+            flex: 1; padding: 6px 8px; border-radius: 6px;
+            background: #f1f5f9; font-size: 11px;
+            font-family: 'Courier New', monospace; color: #1e293b;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            border: 1px solid #e2e8f0;
+        }
+        .icon-btn {
+            padding: 5px 8px; border-radius: 6px;
+            border: 1px solid #e2e8f0; background: white;
+            cursor: pointer; font-size: 11px; color: #374151;
+            transition: all 0.15s; white-space: nowrap;
+        }
+        .icon-btn:hover { background: #f1f5f9; }
+
+        .input-row { display: flex; gap: 5px; }
+        .input-row input { flex: 1; min-width: 0; }
+
+        .guide-toggle {
+            font-size: 11px; color: #3b82f6; cursor: pointer;
+            background: none; border: none; padding: 0; text-align: left;
+        }
+        .guide-content {
+            display: none; font-size: 10px; color: #64748b;
+            line-height: 1.6; background: #f8fafc;
+            padding: 8px; border-radius: 6px;
+        }
+        .guide-content.show { display: block; }
+        .guide-content ol { padding-left: 14px; }
+        .guide-content code { background: #e2e8f0; padding: 1px 3px; border-radius: 3px; font-size: 9px; }
+
+        /* ===== MOBILE ===== */
+        @media (max-width: 640px) {
+            #sidebar {
+                position: fixed; top: 0; bottom: 0;
+                left: -160px; transition: left 0.25s ease;
+            }
+            #sidebar.open { left: 0; box-shadow: 4px 0 20px rgba(0,0,0,0.3); }
+            #menu-btn { display: flex; }
+            #topbar h1 { font-size: 14px; }
+            #week-label { min-width: 80px; font-size: 12px; }
+            #clear-btn { display: none; }
+            #schedule-inner { min-width: 480px; }
+            .block-pin, .block-delete { opacity: 1; width: 16px; height: 16px; font-size: 8px; }
+            .block-resize { height: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="sidebar-backdrop"></div>
+<div id="sidebar">
+    <h2>活動方塊</h2>
+    <div id="preset-list"></div>
+    <hr style="border:none;border-top:1px solid #2e2e3e;margin:4px 0;">
+    <button id="add-custom-btn">＋ 新增自訂</button>
+</div>
+
+<div id="main">
+    <div id="topbar">
+        <button id="menu-btn">☰</button>
+        <h1>📅 週課表</h1>
+        <div id="week-nav">
+            <button class="nav-btn" id="prev-week">‹</button>
+            <span id="week-label"></span>
+            <button class="nav-btn" id="next-week">›</button>
+            <button id="today-btn">今天</button>
+        </div>
+        <div class="topbar-right">
+            <button id="sync-btn"><span id="sync-dot"></span>同步</button>
+            <button id="clear-btn">清除本週</button>
+        </div>
+    </div>
+    <div id="hint">拖曳方塊到課表 · 跨欄移動 · 底部邊框調整長度 · 📌 釘選 = 每週固定</div>
+    <div id="schedule-wrapper">
+        <div id="schedule-inner">
+            <div id="header-row">
+                <div class="time-corner"></div>
+                <div id="day-headers-container"></div>
+            </div>
+            <div id="body-row">
+                <div id="time-col"></div>
+                <div id="day-grids-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增方塊 Modal -->
+<div id="preset-modal" class="modal-overlay">
+    <div class="modal-box">
+        <h3>新增自訂方塊</h3>
+        <div class="form-group">
+            <label>名稱</label>
+            <input type="text" id="custom-name" placeholder="活動名稱..." maxlength="12">
+        </div>
+        <div class="form-group">
+            <label>圖示</label>
+            <div class="emoji-row" id="emoji-row"></div>
+        </div>
+        <div class="form-group">
+            <label>顏色</label>
+            <div class="color-grid" id="color-grid"></div>
+        </div>
+        <div class="modal-btns">
+            <button class="btn btn-secondary" id="modal-cancel">取消</button>
+            <button class="btn btn-primary" id="modal-confirm">新增</button>
+        </div>
+    </div>
+</div>
+
+<!-- 同步設定 Modal -->
+<div id="sync-modal" class="modal-overlay">
+    <div class="modal-box">
+        <h3>🔄 跨裝置同步</h3>
+
+        <!-- 狀態列 -->
+        <div id="sync-status-bar">
+            <span id="sync-status-dot"></span>
+            <span id="sync-status-text">尚未設定同步</span>
+        </div>
+
+        <!-- 步驟 1：Firebase URL -->
+        <div class="sync-step">
+            <div class="sync-step-title">① 設定 Firebase 資料庫 URL</div>
+            <div class="input-row">
+                <input type="text" id="fb-url-input" placeholder="https://your-app-rtdb.firebaseio.com">
+                <button class="icon-btn" id="fb-url-save">儲存</button>
+            </div>
+            <button class="guide-toggle" id="guide-toggle">📖 不知道怎麼取得？展開說明</button>
+            <div class="guide-content" id="guide-content">
+                <ol>
+                    <li>前往 <strong>console.firebase.google.com</strong></li>
+                    <li>建立新專案（免費）</li>
+                    <li>左側選 Build → <strong>Realtime Database</strong></li>
+                    <li>點「建立資料庫」，地區選亞洲</li>
+                    <li>前往「規則」標籤，將內容改為：<br>
+                        <code>{"rules":{".read":true,".write":true}}</code><br>
+                        然後發布
+                    </li>
+                    <li>回到「資料」標籤，複製最上方的 <strong>https://xxx.firebasedatabase.app</strong> 網址</li>
+                    <li>貼到上方輸入框，點儲存</li>
+                </ol>
+                <br>⚠️ 此 App 需部署到 HTTPS 網址才能完整使用 PWA 功能（建議用 Vercel / Netlify / GitHub Pages 免費部署）
+            </div>
+        </div>
+
+        <!-- 步驟 2：同步代碼 -->
+        <div class="sync-step">
+            <div class="sync-step-title">② 取得本裝置同步代碼</div>
+            <div class="sync-step-desc">將此代碼輸入到其他裝置，即可共享同一份課表</div>
+            <div class="sync-code-box">
+                <code id="my-sync-code">—</code>
+                <button class="icon-btn" id="copy-code-btn">📋 複製</button>
+                <button class="icon-btn" id="new-code-btn" title="產生新代碼（舊裝置將失去連線）">🔄</button>
+            </div>
+        </div>
+
+        <!-- 步驟 3：連線其他裝置 -->
+        <div class="sync-step">
+            <div class="sync-step-title">③ 連線到其他裝置</div>
+            <div class="sync-step-desc">輸入其他裝置上顯示的代碼，並點「連線」</div>
+            <div class="input-row">
+                <input type="text" id="other-code-input" placeholder="貼上其他裝置的代碼...">
+                <button class="icon-btn" id="connect-btn">連線</button>
+            </div>
+        </div>
+
+        <!-- 操作按鈕 -->
+        <div class="modal-btns" style="margin-top:4px">
+            <button class="btn btn-secondary" id="sync-push-btn">↑ 上傳</button>
+            <button class="btn btn-secondary" id="sync-pull-btn">↓ 下載</button>
+            <button class="btn btn-primary" id="sync-close-btn">關閉</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== CONSTANTS =====
+const SLOT_H     = 36;
+const SLOT_START = 16;   // 08:00
+const SLOT_END   = 44;   // 22:00
+const VIS_SLOTS  = SLOT_END - SLOT_START;
+const GRID_H     = VIS_SLOTS * SLOT_H;
+
+const DAY_NAMES = ['週一','週二','週三','週四','週五','週六','週日'];
+
+const COLORS = [
+    '#ef4444','#f97316','#f59e0b','#eab308',
+    '#84cc16','#22c55e','#10b981','#14b8a6',
+    '#06b6d4','#3b82f6','#6366f1','#8b5cf6',
+    '#a855f7','#d946ef','#ec4899','#64748b',
+];
+
+const EMOJIS = ['😴','🌅','🍳','🍱','🍜','🍺','💼','📚','🏋️','☕','🎮','🚇','🚿','📝','🎵','🎨','🌿','💊','📞','🛒','✏️','🧘','🤝','🎯'];
+
+const DEFAULT_PRESETS = [
+    { name:'睡覺',  color:'#6d28d9', icon:'😴' },
+    { name:'起床',  color:'#f59e0b', icon:'🌅' },
+    { name:'早餐',  color:'#f97316', icon:'🍳' },
+    { name:'午餐',  color:'#ef4444', icon:'🍱' },
+    { name:'晚餐',  color:'#dc2626', icon:'🍜' },
+    { name:'工作',  color:'#2563eb', icon:'💼' },
+    { name:'學習',  color:'#0891b2', icon:'📚' },
+    { name:'運動',  color:'#16a34a', icon:'🏋️' },
+    { name:'休息',  color:'#64748b', icon:'☕'  },
+    { name:'娛樂',  color:'#ec4899', icon:'🎮' },
+    { name:'通勤',  color:'#92400e', icon:'🚇' },
+    { name:'洗澡',  color:'#0284c7', icon:'🚿' },
+];
+
+// ===== HELPERS =====
+function slotToY(s)    { return (s - SLOT_START) * SLOT_H; }
+function yToSlot(y)    { return Math.round(y / SLOT_H) + SLOT_START; }
+function clamp(s, dur) { return Math.max(SLOT_START, Math.min(s, SLOT_END - dur)); }
+function fmt(m)        { return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; }
+
+function getMonday(offset) {
+    const now = new Date();
+    const diff = now.getDay() === 0 ? -6 : 1 - now.getDay();
+    const mon = new Date(now);
+    mon.setDate(now.getDate() + diff + offset * 7);
+    mon.setHours(0, 0, 0, 0);
+    return mon;
+}
+function dateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function todayStr() { return dateStr(new Date()); }
+
+function uuid4() {
+    return crypto.randomUUID ? crypto.randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+}
+
+// ===== STATE =====
+if (!localStorage.getItem('presets')) {
+    localStorage.setItem('presets', JSON.stringify(DEFAULT_PRESETS));
+}
+let presets      = JSON.parse(localStorage.getItem('presets'));
+let allBlocks    = JSON.parse(localStorage.getItem('allBlocks')    || '[]');
+let pinnedBlocks = JSON.parse(localStorage.getItem('pinnedBlocks') || '[]');
+let weekOffset = 0;
+let weekDates  = [];
+let dragData   = null;
+let selColor   = COLORS[9];
+let selEmoji   = EMOJIS[0];
+let touchClone = null;
+let touchSrcEl = null;
+
+function saveBlocks()  { localStorage.setItem('allBlocks',    JSON.stringify(allBlocks));    Sync.schedule(); }
+function savePinned()  { localStorage.setItem('pinnedBlocks', JSON.stringify(pinnedBlocks)); Sync.schedule(); }
+function savePresets() { localStorage.setItem('presets',      JSON.stringify(presets));      Sync.schedule(); }
+
+// ===== INIT =====
+function init() {
+    buildTimeCol();
+    buildSidebar();
+    renderWeek();
+    setupTopBar();
+    setupPresetModal();
+    setupSyncModal();
+    Sync.init();
+    setInterval(updateNowLine, 60000);
+    setTimeout(() => {
+        const now = new Date();
+        const y = slotToY(now.getHours() * 2 + Math.floor(now.getMinutes() / 30));
+        document.getElementById('schedule-wrapper').scrollTop = Math.max(0, y - 80);
+    }, 80);
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+}
+
+// ===== TIME COLUMN =====
+function buildTimeCol() {
+    const col = document.getElementById('time-col');
+    col.style.height = GRID_H + 'px';
+    col.innerHTML = '';
+    for (let s = SLOT_START; s <= SLOT_END; s += 2) {
+        const lbl = document.createElement('div');
+        lbl.className = 'time-label';
+        lbl.style.top = slotToY(s) + 'px';
+        lbl.textContent = `${String(s/2).padStart(2,'0')}:00`;
+        col.appendChild(lbl);
+    }
+}
+
+// ===== SIDEBAR =====
+function buildSidebar() {
+    const list = document.getElementById('preset-list');
+    list.innerHTML = '';
+    presets.forEach((p, idx) => {
+        const el = document.createElement('div');
+        el.className = 'preset-block';
+        el.style.background = p.color;
+        el.draggable = true;
+        el.innerHTML = `<span class="icon">${p.icon}</span><span>${p.name}</span>`;
+
+        const del = document.createElement('button');
+        del.className = 'del-preset';
+        del.textContent = '✕';
+        del.addEventListener('click', (e) => { e.stopPropagation(); presets.splice(idx, 1); savePresets(); buildSidebar(); });
+        el.appendChild(del);
+
+        el.addEventListener('dragstart', (e) => { dragData = { type:'new', preset:p }; e.dataTransfer.effectAllowed = 'copy'; el.style.opacity = '0.5'; });
+        el.addEventListener('dragend',   () => { el.style.opacity = '1'; clearAllPreviews(); });
+        addTouchDragToPreset(el, p);
+        list.appendChild(el);
+    });
+}
+
+// ===== TOP BAR =====
+function setupTopBar() {
+    document.getElementById('prev-week').addEventListener('click', () => { weekOffset--; renderWeek(); });
+    document.getElementById('next-week').addEventListener('click', () => { weekOffset++; renderWeek(); });
+    document.getElementById('today-btn').addEventListener('click', () => { weekOffset = 0; renderWeek(); });
+    document.getElementById('clear-btn').addEventListener('click', () => {
+        if (!confirm('確定要清除這週的所有「非釘選」課表內容嗎？')) return;
+        allBlocks = allBlocks.filter(b => !weekDates.includes(b.date));
+        saveBlocks();
+        document.querySelectorAll('.schedule-block:not(.is-pinned)').forEach(el => el.remove());
+    });
+    const menuBtn  = document.getElementById('menu-btn');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const sidebar  = document.getElementById('sidebar');
+    menuBtn.addEventListener('click',    () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('show'); });
+    backdrop.addEventListener('click',   () => { sidebar.classList.remove('open'); backdrop.classList.remove('show'); });
+    document.getElementById('sync-btn').addEventListener('click', () => openSyncModal());
+}
+
+// ===== WEEK =====
+function renderWeek() {
+    const monday = getMonday(weekOffset);
+    weekDates = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(monday); d.setDate(monday.getDate() + i);
+        weekDates.push(dateStr(d));
+    }
+    const end = new Date(monday); end.setDate(monday.getDate() + 6);
+    document.getElementById('week-label').textContent =
+        `${monday.getMonth()+1}/${monday.getDate()} – ${end.getMonth()+1}/${end.getDate()}`;
+    buildDayHeaders();
+    buildDayGrids();
+    updateNowLine();
+}
+
+function buildDayHeaders() {
+    const container = document.getElementById('day-headers-container');
+    container.innerHTML = '';
+    const today = todayStr();
+    weekDates.forEach((date, i) => {
+        const d = new Date(date + 'T00:00:00');
+        const div = document.createElement('div');
+        div.className = 'day-header' + (date === today ? ' today' : '') + (i >= 5 ? ' weekend' : '');
+        div.innerHTML = `<div class="day-name">${DAY_NAMES[i]}</div><div class="day-date">${d.getDate()}</div>`;
+        container.appendChild(div);
+    });
+}
+
+function buildDayGrids() {
+    const container = document.getElementById('day-grids-container');
+    container.innerHTML = '';
+    const today = todayStr();
+    weekDates.forEach((date, dayIdx) => {
+        const grid = document.createElement('div');
+        grid.className = 'day-grid' + (date === today ? ' today-col' : '');
+        grid.dataset.date = date;
+        grid.dataset.dayIndex = dayIdx;
+        grid.style.height = GRID_H + 'px';
+
+        for (let s = SLOT_START; s <= SLOT_END; s++) {
+            const line = document.createElement('div');
+            line.className = s % 2 === 0 ? 'hour-line' : 'half-line';
+            line.style.top = slotToY(s) + 'px';
+            grid.appendChild(line);
+        }
+
+        const preview = document.createElement('div');
+        preview.className = 'drop-preview';
+        grid.appendChild(preview);
+
+        if (date === today) {
+            const nowEl = document.createElement('div');
+            nowEl.className = 'now-line'; nowEl.id = 'now-line';
+            nowEl.innerHTML = '<div class="now-dot"></div>';
+            grid.appendChild(nowEl);
+        }
+
+        grid.addEventListener('dragover',  (e) => onDragOver(e, grid));
+        grid.addEventListener('dragleave', (e) => onDragLeave(e, grid));
+        grid.addEventListener('drop',      (e) => onDrop(e, grid));
+        container.appendChild(grid);
+
+        allBlocks.filter(b => b.date === date).forEach(b => makeBlockEl(b, grid, false));
+        pinnedBlocks.filter(b => b.dayOfWeek === dayIdx).forEach(b => makeBlockEl(b, grid, true));
+    });
+}
+
+// ===== NOW LINE =====
+function updateNowLine() {
+    const el = document.getElementById('now-line');
+    if (!el) return;
+    const now = new Date();
+    el.style.top = slotToY(now.getHours() * 2 + Math.floor(now.getMinutes() / 30))
+                  + (now.getMinutes() % 30) / 30 * SLOT_H + 'px';
+}
+
+// ===== DRAG FROM SIDEBAR (mouse) =====
+function onDragOver(e, grid) {
+    e.preventDefault();
+    if (!dragData || dragData.type !== 'new') return;
+    const slot = clamp(yToSlot(e.clientY - grid.getBoundingClientRect().top), 2);
+    const p = grid.querySelector('.drop-preview');
+    p.style.display = 'block';
+    p.style.top = slotToY(slot) + 'px'; p.style.height = (2 * SLOT_H) + 'px';
+    p.style.background = dragData.preset.color + '2a'; p.style.borderColor = dragData.preset.color + 'aa';
+    grid.classList.add('drag-over');
+}
+function onDragLeave(e, grid) {
+    if (!grid.contains(e.relatedTarget)) { grid.querySelector('.drop-preview').style.display = 'none'; grid.classList.remove('drag-over'); }
+}
+function onDrop(e, grid) {
+    e.preventDefault();
+    grid.querySelector('.drop-preview').style.display = 'none'; grid.classList.remove('drag-over');
+    if (!dragData || dragData.type !== 'new') return;
+    const slot = clamp(yToSlot(e.clientY - grid.getBoundingClientRect().top), 2);
+    const b = { id: Date.now(), date: grid.dataset.date, slot, duration: 2, preset: dragData.preset };
+    allBlocks.push(b); saveBlocks();
+    makeBlockEl(b, grid, false);
+    dragData = null;
+}
+function clearAllPreviews() {
+    document.querySelectorAll('.drop-preview').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.day-grid.drag-over').forEach(g => g.classList.remove('drag-over'));
+}
+
+// ===== TOUCH DRAG FROM SIDEBAR =====
+function addTouchDragToPreset(el, preset) {
+    el.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const t = e.touches[0];
+        dragData = { type:'new', preset }; touchSrcEl = el; el.style.opacity = '0.5';
+        const clone = document.createElement('div');
+        clone.className = 'touch-clone'; clone.style.background = preset.color;
+        clone.style.width = el.offsetWidth + 'px';
+        clone.style.left = (t.clientX - el.offsetWidth / 2) + 'px';
+        clone.style.top  = (t.clientY - 18) + 'px';
+        clone.innerHTML  = `<span class="icon">${preset.icon}</span><span>${preset.name}</span>`;
+        document.body.appendChild(clone); touchClone = clone;
+    }, { passive: false });
+
+    el.addEventListener('touchmove', (e) => {
+        if (!touchClone) return; e.preventDefault();
+        const t = e.touches[0];
+        touchClone.style.left = (t.clientX - touchClone.offsetWidth / 2) + 'px';
+        touchClone.style.top  = (t.clientY - 18) + 'px';
+        touchClone.style.visibility = 'hidden';
+        const target = document.elementFromPoint(t.clientX, t.clientY);
+        touchClone.style.visibility = '';
+        const grid = target?.closest('.day-grid');
+        clearAllPreviews();
+        if (grid && dragData) {
+            const slot = clamp(yToSlot(t.clientY - grid.getBoundingClientRect().top), 2);
+            const p = grid.querySelector('.drop-preview');
+            p.style.display = 'block'; p.style.top = slotToY(slot) + 'px'; p.style.height = (2 * SLOT_H) + 'px';
+            p.style.background = dragData.preset.color + '2a'; p.style.borderColor = dragData.preset.color + 'aa';
+        }
+    }, { passive: false });
+
+    const endTouch = (e) => {
+        if (!touchClone) return;
+        touchClone.remove(); touchClone = null;
+        if (touchSrcEl) { touchSrcEl.style.opacity = '1'; touchSrcEl = null; }
+        clearAllPreviews();
+        if (!dragData) return;
+        const t = e.changedTouches[0];
+        const els = document.elementsFromPoint(t.clientX, t.clientY);
+        const grid = els.find(x => x.classList.contains('day-grid'));
+        if (grid) {
+            const slot = clamp(yToSlot(t.clientY - grid.getBoundingClientRect().top), 2);
+            const b = { id: Date.now(), date: grid.dataset.date, slot, duration: 2, preset: dragData.preset };
+            allBlocks.push(b); saveBlocks(); makeBlockEl(b, grid, false);
+        }
+        dragData = null;
+    };
+    el.addEventListener('touchend', endTouch);
+    el.addEventListener('touchcancel', () => {
+        if (touchClone) { touchClone.remove(); touchClone = null; }
+        if (touchSrcEl) { touchSrcEl.style.opacity = '1'; touchSrcEl = null; }
+        clearAllPreviews(); dragData = null;
+    });
+}
+
+// ===== BLOCK ELEMENT =====
+function makeBlockEl(b, grid, isPinned) {
+    const el = document.createElement('div');
+    el.className = 'schedule-block' + (isPinned ? ' is-pinned' : '');
+    el.dataset.id = b.id; el.style.background = b.preset.color;
+
+    const header  = document.createElement('div'); header.className = 'block-header';
+    const nameEl  = document.createElement('div'); nameEl.className = 'block-name';
+    nameEl.innerHTML = `<span>${b.preset.icon}</span><span>${b.preset.name}</span>`;
+    const actions = document.createElement('div'); actions.className = 'block-actions';
+
+    const pinBtn = document.createElement('button');
+    pinBtn.className = 'block-pin' + (isPinned ? ' pinned-on' : '');
+    pinBtn.title = isPinned ? '取消釘選' : '釘選（每週重複）';
+    pinBtn.textContent = '📌';
+    // 用 el.closest() 避免 grid 閉包過期
+    pinBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePin(b, el, isPinned, el.closest('.day-grid')); });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'block-delete'; delBtn.textContent = '✕';
+    delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (isPinned) {
+            if (!confirm('刪除後所有週的此釘選行程都會移除，確定嗎？')) return;
+            pinnedBlocks = pinnedBlocks.filter(x => x.id !== b.id); savePinned();
+        } else {
+            allBlocks = allBlocks.filter(x => x.id !== b.id); saveBlocks();
+        }
+        el.remove();
+    });
+
+    actions.appendChild(pinBtn); actions.appendChild(delBtn);
+    header.appendChild(nameEl); header.appendChild(actions);
+
+    const timeEl   = document.createElement('div'); timeEl.className = 'block-time';
+    const resizeEl = document.createElement('div'); resizeEl.className = 'block-resize';
+
+    el.appendChild(header); el.appendChild(timeEl); el.appendChild(resizeEl);
+    applyPos(el, b);
+
+    el.addEventListener('mousedown', (ev) => {
+        if (ev.target === resizeEl || resizeEl.contains(ev.target) || ev.target === delBtn || ev.target === pinBtn) return;
+        startMove(ev, el, b, isPinned);
+    });
+    el.addEventListener('touchstart', (ev) => {
+        if (ev.target === resizeEl || resizeEl.contains(ev.target) || ev.target === delBtn || ev.target === pinBtn) return;
+        ev.preventDefault(); startTouchMove(ev, el, b, isPinned);
+    }, { passive: false });
+
+    resizeEl.addEventListener('mousedown', (ev) => { ev.stopPropagation(); startResize(ev, el, b, isPinned); });
+    resizeEl.addEventListener('touchstart', (ev) => { ev.stopPropagation(); ev.preventDefault(); startTouchResize(ev, el, b, isPinned); }, { passive: false });
+
+    grid.appendChild(el);
+}
+
+function applyPos(el, b) {
+    el.style.top    = slotToY(b.slot) + 'px';
+    el.style.height = (b.duration * SLOT_H) + 'px';
+    const timeEl = el.querySelector('.block-time');
+    const startM = b.slot * 30;
+    const endM   = Math.min((b.slot + b.duration) * 30, 1320);
+    timeEl.style.display = b.duration >= 2 ? '' : 'none';
+    if (b.duration >= 2) timeEl.textContent = `${fmt(startM)} – ${fmt(endM)}`;
+}
+
+// ===== PIN TOGGLE =====
+function togglePin(b, el, isPinned, grid) {
+    if (!isPinned) {
+        allBlocks = allBlocks.filter(x => x.id !== b.id); saveBlocks();
+        const dayIdx = parseInt(grid.dataset.dayIndex);
+        const pinned = { id: Date.now(), dayOfWeek: dayIdx, slot: b.slot, duration: b.duration, preset: b.preset };
+        pinnedBlocks.push(pinned); savePinned();
+        el.remove(); makeBlockEl(pinned, grid, true);
+    } else {
+        pinnedBlocks = pinnedBlocks.filter(x => x.id !== b.id); savePinned();
+        const date = weekDates[parseInt(grid.dataset.dayIndex)];
+        const regular = { id: Date.now(), date, slot: b.slot, duration: b.duration, preset: b.preset };
+        allBlocks.push(regular); saveBlocks();
+        el.remove(); makeBlockEl(regular, grid, false);
+    }
+}
+
+// ===== MOVE =====
+function startMove(e, el, b, isPinned) {
+    const allGrids = Array.from(document.querySelectorAll('.day-grid'));
+    const origGrid = el.closest('.day-grid');
+    const offsetY  = e.clientY - origGrid.getBoundingClientRect().top - slotToY(b.slot);
+    el.classList.add('is-dragging');
+    let cur = origGrid;
+
+    const onMove = (ev) => {
+        let tg = null;
+        for (const g of allGrids) { const r = g.getBoundingClientRect(); if (ev.clientX >= r.left && ev.clientX <= r.right) { tg = g; break; } }
+        if (!tg) return;
+        if (tg !== cur) { tg.appendChild(el); if (isPinned) b.dayOfWeek = parseInt(tg.dataset.dayIndex); else b.date = tg.dataset.date; cur = tg; }
+        b.slot = clamp(yToSlot(ev.clientY - cur.getBoundingClientRect().top - offsetY), b.duration);
+        applyPos(el, b);
+    };
+    const onUp = () => { el.classList.remove('is-dragging'); saveBlock(b, isPinned); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+}
+
+function startTouchMove(e, el, b, isPinned) {
+    const allGrids = Array.from(document.querySelectorAll('.day-grid'));
+    const origGrid = el.closest('.day-grid');
+    const t0 = e.touches[0];
+    const offsetY = t0.clientY - origGrid.getBoundingClientRect().top - slotToY(b.slot);
+    el.classList.add('is-dragging');
+    let cur = origGrid;
+
+    const onMove = (ev) => {
+        ev.preventDefault();
+        const t = ev.touches[0];
+        el.style.pointerEvents = 'none';
+        const els = document.elementsFromPoint(t.clientX, t.clientY);
+        el.style.pointerEvents = '';
+        const tg = els.find(x => x.classList.contains('day-grid')) || cur;
+        if (tg !== cur) { tg.appendChild(el); if (isPinned) b.dayOfWeek = parseInt(tg.dataset.dayIndex); else b.date = tg.dataset.date; cur = tg; }
+        b.slot = clamp(yToSlot(t.clientY - cur.getBoundingClientRect().top - offsetY), b.duration);
+        applyPos(el, b);
+    };
+    const onEnd = () => { el.classList.remove('is-dragging'); saveBlock(b, isPinned); document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onEnd); document.removeEventListener('touchcancel', onEnd); };
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd);
+    document.addEventListener('touchcancel', onEnd);
+}
+
+// ===== RESIZE =====
+function startResize(e, el, b, isPinned) {
+    e.preventDefault();
+    const startY = e.clientY, sd = b.duration;
+    const onMove = (ev) => { b.duration = Math.max(1, Math.min(sd + Math.round((ev.clientY - startY) / SLOT_H), SLOT_END - b.slot)); applyPos(el, b); };
+    const onUp   = () => { saveBlock(b, isPinned); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
+}
+function startTouchResize(e, el, b, isPinned) {
+    e.preventDefault();
+    const startY = e.touches[0].clientY, sd = b.duration;
+    const onMove = (ev) => { ev.preventDefault(); b.duration = Math.max(1, Math.min(sd + Math.round((ev.touches[0].clientY - startY) / SLOT_H), SLOT_END - b.slot)); applyPos(el, b); };
+    const onEnd  = () => { saveBlock(b, isPinned); document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onEnd); document.removeEventListener('touchcancel', onEnd); };
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd); document.addEventListener('touchcancel', onEnd);
+}
+
+function saveBlock(b, isPinned) {
+    if (isPinned) { const i = pinnedBlocks.findIndex(x => x.id === b.id); if (i >= 0) pinnedBlocks[i] = {...b}; savePinned(); }
+    else          { const i = allBlocks.findIndex(x => x.id === b.id);    if (i >= 0) allBlocks[i]    = {...b}; saveBlocks(); }
+}
+
+// ===== PRESET MODAL =====
+function setupPresetModal() {
+    document.getElementById('add-custom-btn').addEventListener('click', openPresetModal);
+    document.getElementById('modal-cancel').addEventListener('click',  () => document.getElementById('preset-modal').classList.remove('show'));
+    document.getElementById('preset-modal').addEventListener('click',  (e) => { if (e.target === document.getElementById('preset-modal')) document.getElementById('preset-modal').classList.remove('show'); });
+    document.getElementById('modal-confirm').addEventListener('click', () => {
+        const name = document.getElementById('custom-name').value.trim();
+        if (!name) { document.getElementById('custom-name').focus(); return; }
+        presets.push({ name, color: selColor, icon: selEmoji });
+        savePresets(); buildSidebar();
+        document.getElementById('preset-modal').classList.remove('show');
+    });
+    document.getElementById('custom-name').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('modal-confirm').click();
+        if (e.key === 'Escape') document.getElementById('modal-cancel').click();
+    });
+}
+
+function openPresetModal() {
+    document.getElementById('custom-name').value = '';
+    selColor = COLORS[9]; selEmoji = EMOJIS[0];
+
+    const cg = document.getElementById('color-grid'); cg.innerHTML = '';
+    COLORS.forEach(c => {
+        const o = document.createElement('div'); o.className = 'color-opt' + (c === selColor ? ' sel' : ''); o.style.background = c;
+        o.addEventListener('click', () => { cg.querySelectorAll('.color-opt').forEach(x => x.classList.remove('sel')); o.classList.add('sel'); selColor = c; });
+        cg.appendChild(o);
+    });
+
+    const er = document.getElementById('emoji-row'); er.innerHTML = '';
+    EMOJIS.forEach(em => {
+        const o = document.createElement('div'); o.className = 'emoji-opt' + (em === selEmoji ? ' sel' : ''); o.textContent = em;
+        o.addEventListener('click', () => { er.querySelectorAll('.emoji-opt').forEach(x => x.classList.remove('sel')); o.classList.add('sel'); selEmoji = em; });
+        er.appendChild(o);
+    });
+
+    document.getElementById('preset-modal').classList.add('show');
+    setTimeout(() => document.getElementById('custom-name').focus(), 50);
+}
+
+// ===== SYNC MODAL =====
+function setupSyncModal() {
+    document.getElementById('sync-close-btn').addEventListener('click',  () => document.getElementById('sync-modal').classList.remove('show'));
+    document.getElementById('sync-modal').addEventListener('click', (e) => { if (e.target === document.getElementById('sync-modal')) document.getElementById('sync-modal').classList.remove('show'); });
+
+    document.getElementById('fb-url-save').addEventListener('click', () => {
+        const url = document.getElementById('fb-url-input').value.trim().replace(/\/+$/, '');
+        if (!url) return;
+        Sync.setDbUrl(url);
+        Sync.connect();
+        Sync.push();
+        updateSyncModalUI();
+    });
+
+    document.getElementById('copy-code-btn').addEventListener('click', () => {
+        navigator.clipboard.writeText(Sync.getSyncId()).then(() => {
+            const btn = document.getElementById('copy-code-btn');
+            btn.textContent = '✅ 已複製'; setTimeout(() => btn.textContent = '📋 複製', 1500);
+        });
+    });
+
+    document.getElementById('new-code-btn').addEventListener('click', () => {
+        if (!confirm('產生新代碼後，其他已連線的裝置將失去同步，確定嗎？')) return;
+        Sync.newSyncId(); updateSyncModalUI();
+    });
+
+    document.getElementById('connect-btn').addEventListener('click', () => {
+        const code = document.getElementById('other-code-input').value.trim();
+        if (!code) return;
+        Sync.setSyncId(code);
+        Sync.connect();
+        Sync.pull().then(ok => {
+            if (ok) { renderWeek(); buildSidebar(); }
+            else { alert('連線失敗，請確認代碼與 Firebase URL 是否正確'); }
+        });
+        document.getElementById('other-code-input').value = '';
+        updateSyncModalUI();
+    });
+
+    document.getElementById('sync-push-btn').addEventListener('click', () => Sync.push());
+    document.getElementById('sync-pull-btn').addEventListener('click', () => Sync.pull().then(ok => { if (ok) { renderWeek(); buildSidebar(); } }));
+
+    document.getElementById('guide-toggle').addEventListener('click', () => {
+        const gc = document.getElementById('guide-content');
+        gc.classList.toggle('show');
+        document.getElementById('guide-toggle').textContent = gc.classList.contains('show')
+            ? '📖 收起說明' : '📖 不知道怎麼取得？展開說明';
+    });
+}
+
+function openSyncModal() {
+    updateSyncModalUI();
+    document.getElementById('fb-url-input').value = Sync.getDbUrl();
+    document.getElementById('sync-modal').classList.add('show');
+}
+
+function updateSyncModalUI() {
+    document.getElementById('my-sync-code').textContent = Sync.getSyncId();
+}
+
+// ===== CLOUD SYNC MODULE =====
+const Sync = (() => {
+    let dbUrl   = localStorage.getItem('syncDbUrl') || '';
+    let syncId  = localStorage.getItem('syncId')    || uuid4();
+    let evtSrc  = null;
+    let timer   = null;
+    let myPushTs = 0;
+
+    // 持久化 syncId
+    localStorage.setItem('syncId', syncId);
+
+    function getUrl() { return `${dbUrl}/schedules/${syncId}.json`; }
+
+    function setDot(state) {
+        const d = document.getElementById('sync-dot');
+        const s = document.getElementById('sync-status-dot');
+        const t = document.getElementById('sync-status-text');
+        if (!d) return;
+        d.className = state;
+        if (s) s.className = state;
+        const labels = { idle:'尚未設定同步', syncing:'同步中…', ok:'已同步', error:'同步失敗', offline:'離線中' };
+        if (t) t.textContent = labels[state] || '';
+    }
+
+    async function push() {
+        if (!dbUrl || !syncId) return;
+        setDot('syncing');
+        try {
+            myPushTs = Date.now();
+            const data = { presets, allBlocks, pinnedBlocks, updatedAt: myPushTs };
+            const res = await fetch(getUrl(), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            if (!res.ok) throw new Error(res.status);
+            setDot('ok');
+        } catch {
+            setDot(navigator.onLine ? 'error' : 'offline');
+        }
+    }
+
+    async function pull() {
+        if (!dbUrl || !syncId) return false;
+        setDot('syncing');
+        try {
+            const res = await fetch(getUrl());
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            if (!data) { setDot('ok'); return false; }
+            applyData(data);
+            return true;
+        } catch {
+            setDot(navigator.onLine ? 'error' : 'offline');
+            return false;
+        }
+    }
+
+    function applyData(data) {
+        presets      = data.presets      || DEFAULT_PRESETS;
+        allBlocks    = data.allBlocks    || [];
+        pinnedBlocks = data.pinnedBlocks || [];
+        // 直接寫 localStorage，不觸發 schedule()
+        localStorage.setItem('presets',      JSON.stringify(presets));
+        localStorage.setItem('allBlocks',    JSON.stringify(allBlocks));
+        localStorage.setItem('pinnedBlocks', JSON.stringify(pinnedBlocks));
+        setDot('ok');
+    }
+
+    function connect() {
+        if (!dbUrl || !syncId) { setDot('idle'); return; }
+        if (evtSrc) evtSrc.close();
+        setDot('syncing');
+        const url = `${dbUrl}/schedules/${syncId}.json?accept=text/event-stream`;
+        evtSrc = new EventSource(url);
+
+        evtSrc.addEventListener('put', ev => {
+            try {
+                const { data } = JSON.parse(ev.data);
+                if (!data) return;
+                // 忽略自己剛推的資料（2 秒內）
+                if (data.updatedAt && Math.abs(data.updatedAt - myPushTs) < 2000) { setDot('ok'); return; }
+                applyData(data);
+                renderWeek(); buildSidebar();
+            } catch {}
+        });
+
+        evtSrc.onerror = () => {
+            setDot(navigator.onLine ? 'error' : 'offline');
+            setTimeout(() => { if (dbUrl && syncId) connect(); }, 30000);
+        };
+    }
+
+    function schedule() {
+        clearTimeout(timer);
+        timer = setTimeout(push, 1500);
+    }
+
+    function setDbUrl(url) {
+        dbUrl = url.trim().replace(/\/+$/, '');
+        localStorage.setItem('syncDbUrl', dbUrl);
+    }
+
+    function setSyncId(id) {
+        syncId = id.trim();
+        localStorage.setItem('syncId', syncId);
+        if (evtSrc) evtSrc.close();
+    }
+
+    function newSyncId() {
+        setSyncId(uuid4());
+    }
+
+    function getSyncId() { return syncId; }
+    function getDbUrl()  { return dbUrl; }
+
+    function init() {
+        setDot(dbUrl ? 'idle' : 'idle');
+        if (dbUrl) { connect(); }
+        window.addEventListener('online',  () => { connect(); schedule(); });
+        window.addEventListener('offline', () => setDot('offline'));
+    }
+
+    return { init, push, pull, schedule, connect, setDbUrl, setSyncId, newSyncId, getSyncId, getDbUrl };
+})();
+
+// ===== START =====
+init();
+</script>
+</body>
+</html>

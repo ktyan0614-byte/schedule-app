@@ -1,0 +1,16 @@
+{
+  "name": "週課表規劃",
+  "short_name": "週課表",
+  "description": "每週行程規劃，支援跨裝置同步",
+  "start_url": "./schedule.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1e1e2e",
+  "theme_color": "#1e1e2e",
+  "lang": "zh-TW",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
